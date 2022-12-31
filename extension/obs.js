@@ -18,6 +18,7 @@ if (foobarConfig.enabled) {
 }
 const log = new tagged_logger_1.TaggedLogger('OBS');
 let reconnectTimeout;
+let loggedTimestampForCurrentGame = false;
 // Connect to OBS
 if (config.enabled) {
     for (let cropper of config.croppers) {
@@ -44,7 +45,9 @@ function switchToIntermission() {
         sceneName: config.scenes.intermission,
     });
     replicants_1.obsDataReplicant.value.scene = config.scenes.intermission; // sometimes this isn't set automatically, setting it here just in case
-    foobar.unmute();
+    if (foobarConfig.enabled) {
+        foobar.unmute();
+    }
     replicants_1.commentatorsReplicant.value = { amount: 0, names: '' };
     if (!replicants_1.obsDataReplicant.value.studioMode) {
         obs
@@ -64,7 +67,9 @@ function switchFromHostScreen() {
         sceneName: config.scenes.intermission,
     });
     replicants_1.obsDataReplicant.value.scene = config.scenes.intermission; // sometimes this isn't set automatically, setting it here just in case
-    foobar.unmute();
+    if (foobarConfig.enabled) {
+        foobar.unmute();
+    }
 }
 function playIntermissionVideo() {
     obs.call('SetCurrentProgramScene', { sceneName: config.scenes.video });
@@ -256,6 +261,23 @@ obs.on('CurrentProgramSceneChanged', (data) => {
                 foobar.mute();
             }
         }
+        if (config.scenes) {
+            if (replicants_1.obsDataReplicant.value.scene === config.scenes.intermission &&
+                data.sceneName != config.scenes.intermission &&
+                data.sceneName != config.scenes.video) {
+                if (!loggedTimestampForCurrentGame) {
+                    obs.call('GetRecordStatus').then((data) => {
+                        if (data.outputActive) {
+                            (0, nodecg_1.get)().sendMessage('createVoDTimeStamp', {
+                                timestamp: data.outputDuration,
+                                run: replicants_1.activeRunReplicant.value,
+                            });
+                        }
+                    });
+                    loggedTimestampForCurrentGame = true;
+                }
+            }
+        }
         replicants_1.obsDataReplicant.value.scene = data.sceneName;
     }
 });
@@ -286,6 +308,11 @@ obs.on('ConnectionClosed', () => {
     log.info('Rozłączono z OBSem! Próbuję połączyć się ponownie za 5 sekund...');
     setTimeout(reconnectToOBS, 5000);
     replicants_1.obsDataReplicant.value.connected = false;
+});
+replicants_1.activeRunReplicant.on('change', () => {
+    if (loggedTimestampForCurrentGame) {
+        loggedTimestampForCurrentGame = false;
+    }
 });
 (0, nodecg_1.get)().listenFor('switchToIntermission', switchToIntermission);
 (0, nodecg_1.get)().listenFor('switchFromHostScreen', switchFromHostScreen);

@@ -24,4 +24,5 @@ module.exports = (nodecg) => {
     require('./milestones');
     require('./prizes');
     require('./featured');
+    require('./timestamps');
 };
